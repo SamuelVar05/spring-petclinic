@@ -1,46 +1,36 @@
 
 services:
   mysql:
-    image: mysql:9.7
+    image: ${MYSQL_IMAGE:-mysql:9.7}
     ports:
-      - "3306:3306"
+      - "${MYSQL_PORT:-3306}:3306"
     environment:
-      - MYSQL_ROOT_PASSWORD=
-      - MYSQL_ALLOW_EMPTY_PASSWORD=true
-      - MYSQL_USER=petclinic
-      - MYSQL_PASSWORD=petclinic
-      - MYSQL_DATABASE=petclinic
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-root}"
+      MYSQL_ALLOW_EMPTY_PASSWORD: "${MYSQL_ALLOW_EMPTY_PASSWORD:-true}"
+      MYSQL_USER: "${DB_USER:-petclinic}"
+      MYSQL_PASSWORD: "${DB_PASSWORD:-petclinic}"
+      MYSQL_DATABASE: "${MYSQL_DATABASE:-petclinic}"
     volumes:
+      - mysql-data:/var/lib/mysql
       - "./conf.d:/etc/mysql/conf.d:ro"
-
-  postgres:
-    image: postgres:18.4
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_PASSWORD=petclinic
-      - POSTGRES_USER=petclinic
-      - POSTGRES_DB=petclinic
-    volumes:
-      - postgres-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U petclinic -d petclinic"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root --silent"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
 
   petclinic:
-    image: spring-petclinic:4.0.0-SNAPSHOT
+    image: ${PETCLINIC_IMAGE:-us-west1-docker.pkg.dev/entorno-elasticidad/petclinic-repo/spring-petclinic:baseline}
     ports:
-      - "8080:8080"
+      - "${PETCLINIC_PORT:-8080}:8080"
     environment:
-      SPRING_PROFILES_ACTIVE: postgres
-      POSTGRES_URL: jdbc:postgresql://postgres:5432/petclinic
-      POSTGRES_USER: petclinic
-      POSTGRES_PASS: petclinic
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-mysql}
+      MYSQL_URL: jdbc:mysql://${DB_HOST:-mysql}:${DB_PORT:-3306}/${MYSQL_DATABASE:-petclinic}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      MYSQL_USER: ${DB_USER:-petclinic}
+      MYSQL_PASS: ${DB_PASSWORD:-petclinic}
     depends_on:
-      postgres:
+      mysql:
         condition: service_healthy
 
 volumes:
-  postgres-data:
+  mysql-data:
